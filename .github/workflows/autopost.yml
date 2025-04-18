@@ -1,27 +1,26 @@
-name: Main
+name: AutoPost
 
 on:
   schedule:
-    - cron: '*/60 * * * *'  # Запуск каждый час
-  workflow_dispatch:        # Возможность ручного запуска
+    - cron: "*/15 * * * *"  # Запуск каждые 15 минут (можно изменить)
+  workflow_dispatch:
 
 jobs:
-  autopost:
+  post:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Клонирование репозитория
+      - name: 📥 Клонируем репозиторий
         uses: actions/checkout@v3
 
-      - name: Установка Python
+      - name: 🐍 Устанавливаем Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Установка зависимостей
+      - name: 📦 Устанавливаем зависимости
         run: pip install -r requirements.txt
 
-      - name: Запуск скрипта
+      - name: 🚀 Запускаем бота
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
