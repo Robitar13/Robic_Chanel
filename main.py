@@ -13,9 +13,8 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 
-# --- Списки ---
+# --- RSS источники ---
 RSS_FEEDS = [
-    # IT и 3D
     "https://habr.com/ru/rss/flows/develop/all/?fl=ru",
     "https://www.ixbt.com/export/news.rss",
     "https://kod.ru/feed",
@@ -38,48 +37,24 @@ RSS_FEEDS = [
     "https://www.rbc.ru/rss/"
 ]
 
-USED_LINKS_FILE = "posted_links.txt"
-USED_IMAGES_FILE = "used_images.txt"
-
+# --- Эмодзи и хештеги ---
 EMOJIS = ["🚀", "💡", "🔥", "🧠", "📢", "🔧", "⚙️", "🌐", "📱", "🎮"]
 HASHTAGS = ["#Программирование", "#3D", "#AI", "#Новости", "#Графика", "#Технологии"]
 
-# --- Утилиты ---
-def is_posted(link):
-    if not os.path.exists(USED_LINKS_FILE):
-        return False
-    with open(USED_LINKS_FILE, "r", encoding="utf-8") as f:
-        return link in f.read()
-
-def mark_as_posted(link):
-    with open(USED_LINKS_FILE, "a", encoding="utf-8") as f:
-        f.write(link + "\n")
-
-def is_image_used(url):
-    if not os.path.exists(USED_IMAGES_FILE):
-        return False
-    with open(USED_IMAGES_FILE, "r", encoding="utf-8") as f:
-        return url in f.read()
-
-def mark_image_as_used(url):
-    with open(USED_IMAGES_FILE, "a", encoding="utf-8") as f:
-        f.write(url + "\n")
-
+# --- Получение свежей новости ---
 def get_random_news():
     for _ in range(10):
         feed = feedparser.parse(random.choice(RSS_FEEDS))
         for entry in feed.entries:
-            link = entry.link
-            if is_posted(link):
-                continue
             return {
                 "title": entry.title,
                 "summary": entry.summary,
-                "link": link,
+                "link": entry.link,
                 "source": feed.feed.title if hasattr(feed, "feed") else "Источник"
             }
     return None
 
+# --- Генерация текста поста ---
 def stylize_post(news):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -98,9 +73,9 @@ def stylize_post(news):
 📅 {date} · {news['source']}
 
 🔹 Основная суть в 2-4 строках (без воды)
-🔹 Укажи почему это важно или что поменяется
+🔹 Почему это важно или что изменит
 
-📌 Заключение или вопрос для обсуждения  
+📌 Заключение или вопрос  
 <a href="{news['link']}">Читать полностью</a>
 
 {hashtags} 👇
@@ -118,21 +93,29 @@ def stylize_post(news):
             return result['choices'][0]['message']['content']
         else:
             print("⚠️ Ответ без choices:", result)
-            return "⚠️ Не удалось сгенерировать пост. Попробуйте позже."
+            return "⚠️ Не удалось сгенерировать пост."
     except Exception as e:
-        print("⚠️ Ошибка при обработке ответа:", e)
-        return "⚠️ Ошибка генерации."
+        print("⚠️ Ошибка при генерации:", e)
+        return "⚠️ Ошибка при обработке запроса."
 
+# --- Получение случайной картинки ---
 def get_image_url(query):
-    url = f"https://api.unsplash.com/search/photos?query={query}&client_id={UNSPLASH_ACCESS_KEY}"
-    res = requests.get(url).json()
-    for item in res.get("results", []):
-        img = item["urls"]["regular"]
-        if not is_image_used(img):
-            mark_image_as_used(img)
+    search_terms = [
+        query, f"{query} concept", f"{query} art", f"{query} idea",
+        f"{query} tech", f"{query} future", f"{query} workspace"
+    ]
+    random.shuffle(search_terms)
+
+    for term in search_terms:
+        url = f"https://api.unsplash.com/search/photos?query={term}&client_id={UNSPLASH_ACCESS_KEY}"
+        res = requests.get(url).json()
+        results = res.get("results", [])
+        if results:
+            img = random.choice(results)["urls"]["regular"]
             return img
     return None
 
+# --- Публикация в Telegram ---
 def post_to_telegram(text, img_url):
     requests.post(
         f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",
@@ -144,23 +127,23 @@ def post_to_telegram(text, img_url):
         }
     )
 
-# --- Основная логика ---
+# --- Главная функция ---
 def main():
     news = get_random_news()
     if not news:
-        print("😐 Нет новых новостей")
+        print("😐 Новостей не найдено.")
         return
-    print("📰 Найдена новость:", news["title"])
 
+    print("📰 Новость:", news["title"])
     text = stylize_post(news)
-    img = get_image_url("3D modeling" if "3d" in news["summary"].lower() else "programming")
+    query = "3D modeling" if "3d" in news["summary"].lower() else "programming"
+    img = get_image_url(query)
 
     if img:
         post_to_telegram(text, img)
-        mark_as_posted(news["link"])
-        print("✅ Пост опубликован")
+        print("✅ Пост опубликован.")
     else:
-        print("⚠️ Не удалось подобрать изображение")
+        print("⚠️ Картинка не найдена.")
 
 # --- Запуск ---
 if __name__ == "__main__":
