@@ -1,21 +1,21 @@
 import os
-import time
 import random
 import requests
 import feedparser
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- Константы из .env ---
+# --- Переменные окружения ---
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 
-# --- Список RSS-источников ---
+# --- Списки ---
 RSS_FEEDS = [
-    # Программирование и IT
+    # IT и 3D
     "https://habr.com/ru/rss/flows/develop/all/?fl=ru",
     "https://www.ixbt.com/export/news.rss",
     "https://kod.ru/feed",
@@ -30,165 +30,138 @@ RSS_FEEDS = [
     "https://hnrss.org/frontpage",
     "https://www.theverge.com/rss/index.xml",
     "https://feeds.arstechnica.com/arstechnica/index",
-
-    # 3D-моделирование
     "https://www.blendernation.com/feed/",
     "https://80.lv/feed/",
     "https://www.cgchannel.com/feed/",
     "https://www.cgtrader.com/blog.rss",
     "https://3ddd.ru/news/rss",
-
-    # Новости и технологии
     "https://www.rbc.ru/rss/"
 ]
 
+USED_LINKS_FILE = "posted_links.txt"
+USED_IMAGES_FILE = "used_images.txt"
 
-# --- Проверка, публиковалась ли новость ---
+EMOJIS = ["🚀", "💡", "🔥", "🧠", "📢", "🔧", "⚙️", "🌐", "📱", "🎮"]
+HASHTAGS = ["#Программирование", "#3D", "#AI", "#Новости", "#Графика", "#Технологии"]
+
+# --- Утилиты ---
 def is_posted(link):
-    if not os.path.exists("posted_links.txt"):
+    if not os.path.exists(USED_LINKS_FILE):
         return False
-    with open("posted_links.txt", "r", encoding="utf-8") as file:
-        posted = file.read().splitlines()
-    return link in posted
+    with open(USED_LINKS_FILE, "r", encoding="utf-8") as f:
+        return link in f.read()
 
-
-# --- Сохранение новой опубликованной ссылки ---
 def mark_as_posted(link):
-    with open("posted_links.txt", "a", encoding="utf-8") as file:
-        file.write(link + "\n")
+    with open(USED_LINKS_FILE, "a", encoding="utf-8") as f:
+        f.write(link + "\n")
 
-
-# --- Проверка, была ли картинка использована ---
-def is_image_used(image_url):
-    if not os.path.exists("used_images.txt"):
+def is_image_used(url):
+    if not os.path.exists(USED_IMAGES_FILE):
         return False
-    with open("used_images.txt", "r", encoding="utf-8") as file:
-        used_images = file.read().splitlines()
-    return image_url in used_images
+    with open(USED_IMAGES_FILE, "r", encoding="utf-8") as f:
+        return url in f.read()
 
+def mark_image_as_used(url):
+    with open(USED_IMAGES_FILE, "a", encoding="utf-8") as f:
+        f.write(url + "\n")
 
-# --- Сохранение использованной картинки ---
-def mark_image_as_used(image_url):
-    with open("used_images.txt", "a", encoding="utf-8") as file:
-        file.write(image_url + "\n")
-
-
-# --- Фильтр для интересных новостей ---
-def is_interesting(news):
-    keywords = [
-        "ai", "нейросеть", "gpu", "рендер", "unity", "blender", "python",
-        "c++", "3d", "game", "code", "open source", "интерфейс", "design"
-    ]
-    content = (news["title"] + news["summary"]).lower()
-    return any(keyword in content for keyword in keywords)
-
-
-# --- Получение случайной новой новости ---
 def get_random_news():
-    for _ in range(10):  # Попытки найти неповторную новость
-        feed_url = random.choice(RSS_FEEDS)
-        feed = feedparser.parse(feed_url)
-        entries = [
-            entry for entry in feed.entries if entry.title and entry.summary
-        ]
-        random.shuffle(entries)
-
-        for entry in entries:
-            news = {
+    for _ in range(10):
+        feed = feedparser.parse(random.choice(RSS_FEEDS))
+        for entry in feed.entries:
+            link = entry.link
+            if is_posted(link):
+                continue
+            return {
                 "title": entry.title,
                 "summary": entry.summary,
-                "link": entry.link
+                "link": link,
+                "source": feed.feed.title if hasattr(feed, "feed") else "Источник"
             }
-            if not is_posted(news["link"]) and is_interesting(news):
-                return news
     return None
 
-
-# --- Генерация текста поста на русском (без "факт 1", "факт 2") ---
 def stylize_post(news):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json"
     }
 
+    date = datetime.now().strftime("%d.%m.%Y")
+    emoji = random.choice(EMOJIS)
+    hashtags = " ".join(random.sample(HASHTAGS, 2))
+
     prompt = f"""
-Сформируй пост для Telegram-канала по этой новости. Пост должен быть на русском языке, структурированным и красиво оформленным с эмодзи и разметкой (HTML-стиль).
+Сделай короткий, оформленный Telegram-пост на русском языке по этой новости.
 
-Формат:
-🚀 <b>[Заголовок]</b>  
-📅 [Дата] · [Источник]  
+Структура:
+{emoji} <b>{news['title']}</b>  
+📅 {date} · {news['source']}
 
-🔹 <i>[Основной факт]</i>  
-🔹 <i>[Дополнительная информация]</i>  
-🔹 <i>[Последствия/мнение эксперта]</i>  
+🔹 Основная суть в 2-4 строках (без воды)
+🔹 Укажи почему это важно или что поменяется
 
-📌 [1 предложение]  
+📌 Заключение или вопрос для обсуждения  
+<a href="{news['link']}">Читать полностью</a>
 
-#Тэг 👇 Обсуждаем в комментариях!  
+{hashtags} 👇
 """
 
     data = {
         "model": "openai/gpt-3.5-turbo",
-        "messages": [{
-            "role": "user",
-            "content": prompt
-        }]
+        "messages": [{"role": "user", "content": prompt}]
     }
 
-    response = requests.post("https://openrouter.ai/api/v1/chat/completions",
-                             json=data,
-                             headers=headers)
-    return response.json()['choices'][0]['message']['content']
+    res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
+    try:
+        result = res.json()
+        if "choices" in result:
+            return result['choices'][0]['message']['content']
+        else:
+            print("⚠️ Ответ без choices:", result)
+            return "⚠️ Не удалось сгенерировать пост. Попробуйте позже."
+    except Exception as e:
+        print("⚠️ Ошибка при обработке ответа:", e)
+        return "⚠️ Ошибка генерации."
 
-
-# --- Получение изображения с Unsplash (исключая использованные) ---
 def get_image_url(query):
     url = f"https://api.unsplash.com/search/photos?query={query}&client_id={UNSPLASH_ACCESS_KEY}"
-    response = requests.get(url)
-    data = response.json()
-
-    if data.get('results'):
-        for image in data['results']:
-            image_url = image['urls']['regular']
-            if not is_image_used(
-                    image_url
-            ):  # Проверяем, не была ли картинка уже использована
-                mark_image_as_used(image_url)
-                return image_url
+    res = requests.get(url).json()
+    for item in res.get("results", []):
+        img = item["urls"]["regular"]
+        if not is_image_used(img):
+            mark_image_as_used(img)
+            return img
     return None
 
+def post_to_telegram(text, img_url):
+    requests.post(
+        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",
+        data={
+            "chat_id": CHANNEL_USERNAME,
+            "photo": img_url,
+            "caption": text,
+            "parse_mode": "HTML"
+        }
+    )
 
-# --- Публикация в Telegram ---
-def post_with_image(text, image_url):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
-    payload = {
-        "chat_id": CHANNEL_USERNAME,
-        "photo": image_url,
-        "caption": text,
-        "parse_mode": "HTML"
-    }
-    requests.post(url, data=payload)
-
-
-# --- Главная функция ---
+# --- Основная логика ---
 def main():
     news = get_random_news()
-    if news:
-        print("📰 Найдена новость:", news["title"])
-        post_text = stylize_post(news)
-        print("✍️ Сгенерирован пост.")
-        query = "3D modeling" if "3d" in news["summary"].lower(
-        ) else "programming"
-        image_url = get_image_url(query)
-        print("📸 Картинка подобрана.")
-        if image_url:
-            post_with_image(post_text, image_url)
-            mark_as_posted(news["link"])
-            print("✅ Пост опубликован.")
-        else:
-            print("⚠️ Картинка не найдена.")
+    if not news:
+        print("😐 Нет новых новостей")
+        return
+    print("📰 Найдена новость:", news["title"])
 
+    text = stylize_post(news)
+    img = get_image_url("3D modeling" if "3d" in news["summary"].lower() else "programming")
 
-# --- Цикл запуска (каждые 1 час) ---
+    if img:
+        post_to_telegram(text, img)
+        mark_as_posted(news["link"])
+        print("✅ Пост опубликован")
+    else:
+        print("⚠️ Не удалось подобрать изображение")
+
+# --- Запуск ---
 if __name__ == "__main__":
     main()
