@@ -2,7 +2,7 @@ name: Автопостинг в Telegram
 
 on:
   schedule:
-    - cron: "0 * * * *"  # запуск каждый час
+    - cron: "1 * * * *"  # запуск каждый час
   workflow_dispatch:
 
 jobs:
