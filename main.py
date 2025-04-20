@@ -1,20 +1,34 @@
 import os
-import random
 import requests
+import random
 import feedparser
 from datetime import datetime
-from dotenv import load_dotenv
 
-load_dotenv()
-
-# --- Переменные окружения ---
+# Загрузка ключей из переменных окружения (GitHub Secrets)
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHANNEL = os.getenv("CHANNEL_USERNAME")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")
-UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
+UNSPLASH_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 
-# --- RSS источники ---
+# Логи
+USED_LINKS = "used_links.txt"
+USED_IMAGES = "used_images.txt"
+
+# RSS-источники
 RSS_FEEDS = [
+    # AI и нейросети
+    "https://www.technologyreview.com/topic/artificial-intelligence/feed",
+    "https://deepmind.com/blog/feed/basic",
+    "https://openai.com/blog/rss/",
+    "http://ai.googleblog.com/feeds/posts/default?alt=rss",
+    "https://towardsdatascience.com/feed",
+    "https://bair.berkeley.edu/blog/feed.xml",
+    "https://machinelearningmastery.com/blog/feed/",
+    "https://www.aitrends.com/feed/",
+    "https://www.datarobot.com/blog/feed/",
+    "http://www.kdnuggets.com/feed",
+
+    # Программирование
     "https://habr.com/ru/rss/flows/develop/all/?fl=ru",
     "https://www.ixbt.com/export/news.rss",
     "https://kod.ru/feed",
@@ -29,125 +43,144 @@ RSS_FEEDS = [
     "https://hnrss.org/frontpage",
     "https://www.theverge.com/rss/index.xml",
     "https://feeds.arstechnica.com/arstechnica/index",
-    "https://www.blendernation.com/feed/",
+    "https://xakep.ru/feed/",
+    "https://tproger.ru/rss",
+    "https://betheprogrammer.blogspot.com/feeds/posts/default",
+    "https://www.hackr.io/feed",
+    "https://medium.com/feed",
+    "https://idiomaticprogrammers.com/rss.xml",
+    "https://reactgo.com/feed.xml",
+    "https://stackabuse.com/feed",
+
+    # Геймдев и движки
     "https://80.lv/feed/",
+    "https://www.gamedeveloper.com/rss.xml",
+    "https://godotengine.org/rss.xml",
+    "http://gcup.ru/news/rss/",
+    "http://gcup.ru/load/rss/",
+    "http://gcup.ru/publ/rss/",
+    "http://gcup.ru/blog/rss/",
+    "http://gcup.ru/dir/rss/",
+    "http://gcup.ru/photo/rss/",
+    "http://gcup.ru/forum/0-0-0-37",
+
+    # 3D / CAD
+    "https://www.blendernation.com/feed/",
     "https://www.cgchannel.com/feed/",
     "https://www.cgtrader.com/blog.rss",
     "https://3ddd.ru/news/rss",
+    "https://blogs.solidworks.com/solidworksblog/feed",
+    "https://blender.org/feed/",
+
+    # Общее
     "https://www.rbc.ru/rss/"
 ]
 
-EMOJIS = ["🚀", "💡", "🔥", "🧠", "📢", "🔧", "⚙️", "🌐", "📱", "🎮"]
-HASHTAGS = ["#Программирование", "#3D", "#AI", "#Новости", "#Графика", "#Технологии"]
+def is_posted(link):
+    if not os.path.exists(USED_LINKS):
+        return False
+    with open(USED_LINKS, "r", encoding="utf-8") as f:
+        return link in f.read()
 
-# --- Получение новости ---
-def get_random_news():
+def mark_posted(link):
+    with open(USED_LINKS, "a", encoding="utf-8") as f:
+        f.write(link + "\n")
+
+def is_image_used(url):
+    if not os.path.exists(USED_IMAGES):
+        return False
+    with open(USED_IMAGES, "r", encoding="utf-8") as f:
+        return url in f.read()
+
+def mark_image_used(url):
+    with open(USED_IMAGES, "a", encoding="utf-8") as f:
+        f.write(url + "\n")
+
+def get_unique_news():
     for _ in range(10):
         feed = feedparser.parse(random.choice(RSS_FEEDS))
         for entry in feed.entries:
-            return {
-                "title": entry.title,
-                "summary": entry.summary,
-                "link": entry.link,
-                "source": feed.feed.title if hasattr(feed, "feed") else "Источник"
-            }
+            if not is_posted(entry.link):
+                return {
+                    "title": entry.title,
+                    "summary": entry.summary,
+                    "link": entry.link,
+                    "source": feed.feed.title if hasattr(feed, "feed") else "Источник"
+                }
     return None
 
-# --- Генерация текста поста (понятно и просто) ---
 def stylize_post(news):
+    prompt = f"""
+Оформи Telegram-пост на русском языке с лёгким юмором, чтобы даже новичок понял. Формат:
+
+🚀 <b>Заголовок</b>
+📅 Дата и источник
+🔹 1-2 абзаца суть без воды
+💡 Почему важно
+🤔 Вопрос для обсуждения
+🔗 Ссылка
+
+Новость:
+Заголовок: {news['title']}
+Описание: {news['summary']}
+Источник: {news['source']}
+Ссылка: {news['link']}
+"""
+
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json"
     }
-
-    emoji = random.choice(EMOJIS)
-    hashtags = " ".join(random.sample(HASHTAGS, 2))
-
-    prompt = f"""
-Ты — Telegram-бот, публикующий IT-новости для начинающих. Сделай понятный пост на русском языке, который будет интересен даже тем, кто только начал изучать программирование или 3D-графику.
-
-<b>Важно:</b>
-– Используй простой, живой язык без сложных терминов.  
-– Объясняй, если встречаются незнакомые слова.  
-– Добавь эмодзи, хештеги и форматирование.  
-– Вставь ссылку на источник в конце.  
-– Стиль — дружелюбный и понятный, как от человека.  
-– Без маркировок вроде "факт 1", "доп.инфо" и т.п.
-
-Исходные данные:
-Заголовок: {news['title']}
-Описание: {news['summary']}
-Ссылка: {news['link']}
-Источник: {news['source']}
-Дата: {datetime.now().strftime("%d.%m.%Y")}
-
-Формат: HTML для Telegram.
-"""
 
     data = {
         "model": "openai/gpt-3.5-turbo",
         "messages": [{"role": "user", "content": prompt}]
     }
 
-    res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
+    r = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
     try:
-        result = res.json()
-        if "choices" in result:
-            return result['choices'][0]['message']['content']
-        else:
-            print("⚠️ Ответ без choices:", result)
-            return "⚠️ Не удалось сгенерировать пост."
+        return r.json()['choices'][0]['message']['content']
     except Exception as e:
-        print("⚠️ Ошибка при генерации:", e)
-        return "⚠️ Ошибка при обработке запроса."
+        print("⚠️ Ошибка генерации:", e)
+        return f"<b>{news['title']}</b>\n{news['link']}"
 
-# --- Получение картинки по теме ---
 def get_image_url(query):
-    search_terms = [
-        query, f"{query} concept", f"{query} art", f"{query} idea",
-        f"{query} tech", f"{query} future", f"{query} workspace"
-    ]
-    random.shuffle(search_terms)
-
-    for term in search_terms:
-        url = f"https://api.unsplash.com/search/photos?query={term}&client_id={UNSPLASH_ACCESS_KEY}"
-        res = requests.get(url).json()
-        results = res.get("results", [])
-        if results:
-            img = random.choice(results)["urls"]["regular"]
+    url = f"https://api.unsplash.com/search/photos?query={query}&client_id={UNSPLASH_KEY}"
+    res = requests.get(url).json()
+    for item in res.get("results", []):
+        img = item["urls"]["regular"]
+        if not is_image_used(img):
+            mark_image_used(img)
             return img
     return None
 
-# --- Публикация в Telegram ---
-def post_to_telegram(text, img_url):
-    requests.post(
-        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",
-        data={
-            "chat_id": CHANNEL_USERNAME,
-            "photo": img_url,
-            "caption": text,
-            "parse_mode": "HTML"
-        }
-    )
+def post_to_telegram(text, image_url):
+    url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto"
+    payload = {
+        "chat_id": CHANNEL,
+        "photo": image_url,
+        "caption": text,
+        "parse_mode": "HTML"
+    }
+    requests.post(url, data=payload)
 
-# --- Главная функция ---
 def main():
-    news = get_random_news()
+    news = get_unique_news()
     if not news:
-        print("😐 Новостей не найдено.")
+        print("❌ Нет новых новостей")
         return
 
-    print("📰 Новость:", news["title"])
-    text = stylize_post(news)
-    query = "3D modeling" if "3d" in news["summary"].lower() else "programming"
-    img = get_image_url(query)
+    print("🗞️ Новость найдена:", news['title'])
+    post_text = stylize_post(news)
+    keyword = "ai" if "ai" in news["summary"].lower() else "technology"
+    image_url = get_image_url(keyword)
 
-    if img:
-        post_to_telegram(text, img)
-        print("✅ Пост опубликован.")
+    if image_url:
+        post_to_telegram(post_text, image_url)
+        mark_posted(news["link"])
+        print("✅ Пост опубликован!")
     else:
-        print("⚠️ Картинка не найдена.")
+        print("⚠️ Картинка не найдена")
 
-# --- Запуск ---
 if __name__ == "__main__":
     main()
