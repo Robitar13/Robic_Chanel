@@ -1,29 +1,25 @@
-name: AutoPost
+name: AutoPost News
 
 on:
   schedule:
-    - cron: "*/360 * * * *"  # Запуск каждые 120 минут (можно изменить)
+    - cron: "0 */4 * * *" # каждые 2 часа
   workflow_dispatch:
 
 jobs:
-  post:
+  run:
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 Клонируем репозиторий
-        uses: actions/checkout@v3
-
-      - name: 🐍 Устанавливаем Python
+      - uses: actions/checkout@v3
+      - name: Установка Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
-
-      - name: 📦 Устанавливаем зависимости
+          python-version: "3.10"
+      - name: Установка зависимостей
         run: pip install -r requirements.txt
-
-      - name: 🚀 Запускаем бота
+      - name: Запуск бота
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           CHANNEL_USERNAME: ${{ secrets.CHANNEL_USERNAME }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
         run: python main.py
