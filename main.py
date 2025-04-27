@@ -38,6 +38,7 @@ RSS_FEEDS = [
     "https://www.aitrends.com/feed/",
     "https://www.datarobot.com/blog/feed/",
     "http://www.kdnuggets.com/feed",
+
     # Программирование и геймдев
     "https://habr.com/ru/rss/flows/develop/all/?fl=ru",
     "https://www.ixbt.com/export/news.rss",
@@ -55,24 +56,20 @@ RSS_FEEDS = [
     "https://feeds.arstechnica.com/arstechnica/index",
     "https://xakep.ru/feed/",
     "https://tproger.ru/rss",
+
     # Геймдев / Unity / Godot
     "https://80.lv/feed/",
     "https://www.gamedeveloper.com/rss.xml",
     "https://godotengine.org/rss.xml",
-    "http://gcup.ru/news/rss/",
-    "http://gcup.ru/load/rss/",
-    "http://gcup.ru/publ/rss/",
-    "http://gcup.ru/blog/rss/",
-    "http://gcup.ru/dir/rss/",
-    "http://gcup.ru/photo/rss/",
-    "http://gcup.ru/forum/0-0-0-37",
+
     # 3D / CAD
     "https://www.blendernation.com/feed/",
     "https://www.cgchannel.com/feed/",
     "https://www.cgtrader.com/blog.rss",
     "https://3ddd.ru/news/rss",
     "https://blogs.solidworks.com/solidworksblog/feed",
-    "https://blender.org/feed/",
+    "https://www.blender.org/feed/",
+
     # Общее
     "https://www.rbc.ru/rss/"
 ]
