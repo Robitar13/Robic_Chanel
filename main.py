@@ -199,11 +199,12 @@ def post_to_telegram(text, image_url=None):
                 "parse_mode": "HTML"
             }
         )
-post_text = stylize_post(news)
+
 
 
 # --- Основной запуск ---
 def main():
+    post_text = stylize_post(news)
     news = get_unique_news()
     if not news:
         print("😐 Нет подходящих новостей")
