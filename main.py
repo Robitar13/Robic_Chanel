@@ -174,34 +174,6 @@ def stylize_post(news):
 - Описание: {news['summary']}
 - Источник: {news['source']}
 """
-
-    headers = {
-@@ -162,53 +162,60 @@
-    }
-
-    data = {
-        "model": "openai/gpt-3.5-turbo",
-        "model": "openai/gpt-3.5-turbo",  # Или укажи gpt-4 если доступно
-        "temperature": 0.7,
-        "messages": [{"role": "user", "content": prompt}]
-    }
-
-    try:
-        r = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
-        return r.json()['choices'][0]['message']['content']
-        response_data = r.json()
-        if 'choices' in response_data:
-            return response_data['choices'][0]['message']['content']
-        else:
-            print("⚠️ OpenRouter не вернул поле choices:", response_data)
-            return f"<b>{news['title']}</b>\n<a href='{news['link']}'>📖 Читать подробнее</a>"
-    except Exception as e:
-        print("⚠️ Ошибка генерации:", e)
-        return f"<b>{news['title']}</b>\n{news['link']}"
-        print("⚠️ Ошибка при запросе к OpenRouter:", e)
-        return f"<b>{news['title']}</b>\n<a href='{news['link']}'>📖 Читать подробнее</a>"
-
-
 # --- Отправка поста ---
 def post_to_telegram(text, image_url):
     url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto"
