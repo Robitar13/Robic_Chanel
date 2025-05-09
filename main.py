@@ -72,13 +72,14 @@ def get_image_url(entry):
 # --- Генерация текста поста через gen-api.ru (Gemini) ---
 def generate_post_text(title, summary, source, link):
     prompt = f"""
-Ты — автор Telegram-канала о технологиях, программировании и 3D-графике.
+Ты — автор Telegram-канала о технологиях и программировании.
 
-Составь интересный пост на русском языке. Формат:
+Составь интересный пост на русском языке. Стиль — дружелюбный, понятный даже новичку. Минимум 8 предложений.
 
+Формат:
 🚀 <b>Заголовок</b>  
 📅 Дата + источник  
-🔹 Основной текст — минимум 8 предложений, живой стиль, без воды  
+🔹 Основной текст — понятный, без лишней воды  
 🤔 Вопрос для обсуждения  
 <a href="{link}">📖 Читать подробнее</a>
 
@@ -90,22 +91,27 @@ def generate_post_text(title, summary, source, link):
 """
 
     headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
-
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Content-Type": "application/json"
     }
 
     data = {
-        "model": "gemini-pro",
-        "messages": [{"role": "user", "content": prompt}]
+        "model": "deepseek-chat",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7
     }
 
     try:
-        res = requests.post("https://api.gen-api.ru/api/v1/chat/completions", headers=headers, json=data)
+        res = requests.post("https://api.deepseek.com/v1/chat/completions", headers=headers, json=data)
         result = res.json()
-        return result["choices"][0]["message"]["content"]
+
+        if "choices" in result:
+            return result["choices"][0]["message"]["content"]
+        else:
+            print("⚠️ DeepSeek не вернул 'choices':", result)
+            return None
     except Exception as e:
-        print("⚠️ Ошибка генерации:", e)
+        print("⚠️ Ошибка при запросе к DeepSeek:", e)
         return None
 
 # --- Получение подходящей новости ---
