@@ -91,7 +91,8 @@ def generate_post_text(title, summary, source, link):
 
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {GEN_API_KEY}"
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
+
     }
 
     data = {
