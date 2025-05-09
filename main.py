@@ -11,7 +11,7 @@ load_dotenv()
 # --- Получение секретов из переменных окружения ---
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHANNEL = os.getenv("CHANNEL_USERNAME")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 UNSPLASH_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 
 # --- Пути к файлам ---
