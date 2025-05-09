@@ -2,8 +2,11 @@ import os
 import requests
 import random
 import feedparser
-from datetime import datetime
 from bs4 import BeautifulSoup
+from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- Получение секретов из переменных окружения ---
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -15,66 +18,22 @@ UNSPLASH_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 USED_LINKS_FILE = "used_links.txt"
 USED_IMAGES_FILE = "used_images.txt"
 
-# --- Политический фильтр ---
-def is_political(text: str) -> bool:
-    political_keywords = [
-        "украина", "україна", "ukraine", "zelensky", "зеленский", "киев", "київ",
-        "донбасс", "донецк", "луганск", "война",
-        "военные", "конфликт", "санкции", "мобилизация", "спецоперация"
-    ]
-    text_lower = text.lower()
-    return any(word in text_lower for word in political_keywords)
-
-# --- RSS источники ---
+# --- RSS-источники ---
 RSS_FEEDS = [
-    # AI и нейросети
-    "https://www.technologyreview.com/topic/artificial-intelligence/feed",
-    "https://deepmind.com/blog/feed/basic",
-    "https://openai.com/blog/rss/",
-    "http://ai.googleblog.com/feeds/posts/default?alt=rss",
-    "https://towardsdatascience.com/feed",
-    "https://bair.berkeley.edu/blog/feed.xml",
-    "https://machinelearningmastery.com/blog/feed/",
-    "https://www.aitrends.com/feed/",
-    "https://www.datarobot.com/blog/feed/",
-    "http://www.kdnuggets.com/feed",
-
-    # Программирование и геймдев
     "https://habr.com/ru/rss/flows/develop/all/?fl=ru",
-    "https://www.ixbt.com/export/news.rss",
-    "https://kod.ru/feed",
-    "https://www.cnews.ru/inc/rss/news.xml",
-    "https://stackoverflow.blog/feed/",
     "https://dev.to/feed",
     "https://medium.com/feed/tag/programming",
-    "https://techcrunch.com/feed/",
-    "https://www.digitaltrends.com/feed/",
-    "https://thenextweb.com/feed",
-    "https://www.pcworld.com/index.rss",
-    "https://hnrss.org/frontpage",
-    "https://www.theverge.com/rss/index.xml",
-    "https://feeds.arstechnica.com/arstechnica/index",
-    "https://xakep.ru/feed/",
-    "https://tproger.ru/rss",
-
-    # Геймдев / Unity / Godot
-    "https://80.lv/feed/",
-    "https://www.gamedeveloper.com/rss.xml",
-    "https://godotengine.org/rss.xml",
-
-    # 3D / CAD
     "https://www.blendernation.com/feed/",
-    "https://www.cgchannel.com/feed/",
-    "https://www.cgtrader.com/blog.rss",
-    "https://3ddd.ru/news/rss",
-    "https://blogs.solidworks.com/solidworksblog/feed",
-    "https://www.blender.org/feed/",
-
-    # Общее
-    "https://www.rbc.ru/rss/"
+    "https://towardsdatascience.com/feed",
+    "https://godotengine.org/rss.xml"
 ]
 
-# --- Утилиты: ссылки ---
+# --- Фильтр политики ---
+def is_political(text):
+    banned = ["украина", "донбасс", "зеленский", "спецоперация", "санкции", "мобилизация"]
+    return any(word in text.lower() for word in banned)
+
+# --- История публикаций ---
 def is_posted(link):
     if not os.path.exists(USED_LINKS_FILE):
         return False
@@ -85,7 +44,14 @@ def mark_posted(link):
     with open(USED_LINKS_FILE, "a", encoding="utf-8") as f:
         f.write(link + "\n")
 
-# --- Утилиты: изображения ---
+# --- Работа с изображениями ---
+def extract_image_url(entry):
+    soup = BeautifulSoup(entry.get("summary", ""), "html.parser")
+    img_tag = soup.find("img")
+    if img_tag and img_tag.get("src"):
+        return img_tag.get("src")
+    return None
+
 def is_image_used(url):
     if not os.path.exists(USED_IMAGES_FILE):
         return False
@@ -96,13 +62,6 @@ def mark_image_used(url):
     with open(USED_IMAGES_FILE, "a", encoding="utf-8") as f:
         f.write(url + "\n")
 
-def extract_image_url(entry):
-    soup = BeautifulSoup(entry.get("summary", ""), "html.parser")
-    img_tag = soup.find("img")
-    if img_tag and img_tag.get("src"):
-        return img_tag.get("src")
-    return None
-
 def get_image_url(entry):
     url = extract_image_url(entry)
     if url and not is_image_used(url):
@@ -110,112 +69,117 @@ def get_image_url(entry):
         return url
     return None
 
-# --- Получение новости ---
-def get_unique_news():
+# --- Генерация текста поста через gen-api.ru (Gemini) ---
+def generate_post_text(title, summary, source, link):
+    prompt = f"""
+Ты — автор Telegram-канала о технологиях, программировании и 3D-графике.
+
+Составь интересный пост на русском языке. Формат:
+
+🚀 <b>Заголовок</b>  
+📅 Дата + источник  
+🔹 Основной текст — минимум 8 предложений, живой стиль, без воды  
+🤔 Вопрос для обсуждения  
+<a href="{link}">📖 Читать подробнее</a>
+
+Новость:
+Заголовок: {title}
+Описание: {summary}
+Источник: {source}
+Ссылка: {link}
+"""
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {GEN_API_KEY}"
+    }
+
+    data = {
+        "model": "gemini-pro",
+        "messages": [{"role": "user", "content": prompt}]
+    }
+
+    try:
+        res = requests.post("https://api.gen-api.ru/api/v1/chat/completions", headers=headers, json=data)
+        result = res.json()
+        return result["choices"][0]["message"]["content"]
+    except Exception as e:
+        print("⚠️ Ошибка генерации:", e)
+        return None
+
+# --- Получение подходящей новости ---
+def get_news():
     for _ in range(10):
         feed = feedparser.parse(random.choice(RSS_FEEDS))
         for entry in feed.entries:
             title = entry.get("title", "")
             summary = entry.get("summary", "")
             link = entry.get("link", "")
+            source = feed.feed.get("title", "Источник")
+
             if is_posted(link):
                 continue
-            if is_political(title) or is_political(summary):
-                print("⚠️ Пропущена политическая новость:", title)
+            if is_political(title + summary):
                 continue
+            if not summary or len(summary) < 40:
+                continue
+
             return {
                 "title": title,
                 "summary": summary,
                 "link": link,
-                "source": feed.feed.title if hasattr(feed, "feed") else "Источник",
+                "source": source,
                 "entry": entry
             }
     return None
 
-# --- Генерация поста ---
-def stylize_post(news):
-    prompt = f"""
-Ты — автор Telegram-канала про IT, 3D-моделирование и нейросети.
+# --- Отправка в Telegram ---
+def post_to_telegram(text, image_url=None):
+    if image_url:
+        url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto"
+        data = {
+            "chat_id": CHANNEL,
+            "photo": image_url,
+            "caption": text,
+            "parse_mode": "HTML"
+        }
+    else:
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        data = {
+            "chat_id": CHANNEL,
+            "text": text,
+            "parse_mode": "HTML"
+        }
 
-Создай красивый, интересный пост на русском языке, в котором:
-
-- Минимум 8 предложений.
-- Живой стиль, будто общаешься с другом.
-- Начни пост с эмодзи 🚀 и выдели заголовок с <b>жирным</b> тегом.
-- Укажи дату 📅 и источник публикации.
-- Объясни суть новости понятным языком в 5-8 предложениях.
-- Расскажи, почему это важно или интересно.
-- Заверши пост вовлекающим вопросом с эмодзи 🤔.
-- Добавь ссылку: <a href="{news['link']}">📖 Читать подробнее</a>.
-
-Избегай политики, сложных терминов и канцелярщины. Пиши понятно для новичков.
-
-Данные новости:
-- Заголовок: {news['title']}
-- Описание: {news['summary']}
-- Источник: {news['source']}
-"""
-
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    data = {
-        "model": "openai/gpt-3.5-turbo",  # Или укажи gpt-4 если доступно
-        "temperature": 0.7,
-        "messages": [{"role": "user", "content": prompt}]
-    }
-
-    try:
-        r = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
-        response_data = r.json()
-        if 'choices' in response_data:
-            return response_data['choices'][0]['message']['content']
-        else:
-            print("⚠️ OpenRouter не вернул поле choices:", response_data)
-            return f"<b>{news['title']}</b>\n<a href='{news['link']}'>📖 Читать подробнее</a>"
-    except Exception as e:
-        print("⚠️ Ошибка при запросе к OpenRouter:", e)
-        return f"<b>{news['title']}</b>\n<a href='{news['link']}'>📖 Читать подробнее</a>"
-
-
-# --- Отправка поста ---
-def post_to_telegram(text, image_url):
-    url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto"
-    payload = {
-        "chat_id": CHANNEL,
-        "photo": image_url,
-        "caption": text,
-        "parse_mode": "HTML"
-    }
-    response = requests.post(url, data=payload)
-    if response.status_code != 200:
-        print("⚠️ Ошибка отправки:", response.text)
+    requests.post(url, data=data)
 
 # --- Основной запуск ---
 def main():
-    news = get_unique_news()
-    if not news:
-        print("😐 Нет подходящих новостей")
-        return
+    attempts = 0
+    while attempts < 5:
+        news = get_news()
+        if not news:
+            print("😐 Нет подходящих новостей")
+            return
 
-    print("📰 Новость:", news["title"])
-    post_text = stylize_post(news)
-    image_url = get_image_url(news["entry"])
+        print("📰 Новость:", news["title"])
 
-    if image_url:
+        post_text = generate_post_text(news["title"], news["summary"], news["source"], news["link"])
+
+        if not post_text or len(post_text.split()) < 20:
+            print("❌ Слабый текст, пробуем другую новость...")
+            attempts += 1
+            continue
+
+        image_url = get_image_url(news["entry"])
         post_to_telegram(post_text, image_url)
-    else:
-        print("⚠️ Картинка не найдена, отправка только текста")
-        requests.post(
-            f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-            data={"chat_id": CHANNEL, "text": post_text, "parse_mode": "HTML"}
-        )
+        mark_posted(news["link"])
+        print("✅ Пост опубликован!")
+        break
 
-    mark_posted(news["link"])
-    print("✅ Пост опубликован")
+    if attempts == 5:
+        print("❌ Не удалось сгенерировать достойный пост.")
 
-# --- Точка входа ---
 if __name__ == "__main__":
     main()
+
