@@ -182,9 +182,9 @@ def post_to_telegram(text, image_url=None):
 
     if image_url:
         requests.post(
-            f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",
             data={
-                "chat_id": CHANNEL,
+                "chat_id": CHANNEL_USERNAME,
                 "photo": image_url,
                 "caption": text,
                 "parse_mode": "HTML"
@@ -192,9 +192,9 @@ def post_to_telegram(text, image_url=None):
         )
     else:
         requests.post(
-            f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
             data={
-                "chat_id": CHANNEL,
+                "chat_id": CHANNEL_USERNAME,
                 "text": text,
                 "parse_mode": "HTML"
             }
@@ -218,8 +218,8 @@ def main():
     else:
         print("⚠️ Картинка не найдена, отправка только текста")
         requests.post(
-            f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-            data={"chat_id": CHANNEL, "text": post_text, "parse_mode": "HTML"}
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+            data={"chat_id": CHANNEL_USERNAME, "text": post_text, "parse_mode": "HTML"}
         )
 
     mark_posted(news["link"])
