@@ -176,8 +176,8 @@ def stylize_post(news):
 """
 # --- Отправка поста ---
 def post_to_telegram(text, image_url=None):
-    if not text or len(text.strip()) < 10:
-        print("⚠️ Пустой или слишком короткий текст. Не отправляем.")
+    if not post_text or len(post_text.strip()) < 20:
+        print("❌ Текст не сгенерирован или слишком короткий. Пропускаем.")
         return
 
     if image_url:
@@ -201,9 +201,6 @@ def post_to_telegram(text, image_url=None):
         )
 post_text = stylize_post(news)
 
-if not post_text or len(post_text.strip()) < 20:
-    print("❌ Текст не сгенерирован или слишком короткий. Пропускаем.")
-    return
 
 # --- Основной запуск ---
 def main():
