@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- Секреты и токены ---
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHANNEL = os.getenv("CHANNEL_USERNAME")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 GEN_API_KEY = os.getenv("GEN_API_KEY")
 
