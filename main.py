@@ -132,7 +132,12 @@ def generate_post_text(title, summary, source, link):
     try:
         r = requests.post("https://api.deepseek.com/v1/chat/completions", headers=headers, json=data)
         result = r.json()
-        return result['choices'][0]['message']['content']
+
+        if 'choices' in result:
+            return result['choices'][0]['message']['content']
+        else:
+            print("⚠️ DeepSeek не вернул поле 'choices':", result)
+            return None
     except Exception as e:
         print("⚠️ Ошибка генерации:", e)
         return None
