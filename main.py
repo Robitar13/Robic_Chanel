@@ -175,17 +175,35 @@ def stylize_post(news):
 - Источник: {news['source']}
 """
 # --- Отправка поста ---
-def post_to_telegram(text, image_url):
-    url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto"
-    payload = {
-        "chat_id": CHANNEL,
-        "photo": image_url,
-        "caption": text,
-        "parse_mode": "HTML"
-    }
-    response = requests.post(url, data=payload)
-    if response.status_code != 200:
-        print("⚠️ Ошибка отправки:", response.text)
+def post_to_telegram(text, image_url=None):
+    if not text or len(text.strip()) < 10:
+        print("⚠️ Пустой или слишком короткий текст. Не отправляем.")
+        return
+
+    if image_url:
+        requests.post(
+            f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
+            data={
+                "chat_id": CHANNEL,
+                "photo": image_url,
+                "caption": text,
+                "parse_mode": "HTML"
+            }
+        )
+    else:
+        requests.post(
+            f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+            data={
+                "chat_id": CHANNEL,
+                "text": text,
+                "parse_mode": "HTML"
+            }
+        )
+post_text = stylize_post(news)
+
+if not post_text or len(post_text.strip()) < 20:
+    print("❌ Текст не сгенерирован или слишком короткий. Пропускаем.")
+    return
 
 # --- Основной запуск ---
 def main():
